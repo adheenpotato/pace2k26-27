@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>y2k26-27</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: "Segoe UI", sans-serif;
+    background: linear-gradient(135deg, #1e3c72, #2a5298);
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+/* CONTAINER */
+.calendar {
+    width: 92%;
+    max-width: 900px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 20px;
+    padding: 20px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+/* HEADER */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+button {
+    background: #ffcc00;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: 0.2s;
+}
+
+button:hover {
+    transform: scale(1.08);
+}
+
+.month-title {
+    font-size: 24px;
+    font-weight: bold;
+}
+
+/* WEEKDAYS */
+.weekdays, .days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+}
+
+.weekdays div {
+    padding: 10px;
+    font-weight: bold;
+    color: #ffdd57;
+}
+
+/* DAY BOX */
+.day {
+    background: rgba(255,255,255,0.08);
+    margin: 3px;
+    border-radius: 12px;
+    min-height: 80px;
+    padding: 6px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    position: relative;
+}
+
+/* HOVER ANIMATION */
+.day:hover {
+    transform: translateY(-6px) scale(1.03);
+    background: rgba(255,255,255,0.18);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+}
+
+/* DATE NUMBER */
+.date {
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+/* EVENT LABEL */
+.event {
+    margin-top: 5px;
+    font-size: 12px;
+    background: linear-gradient(90deg, #ff6b6b, #ff8e53);
+    padding: 3px 6px;
+    border-radius: 6px;
+    display: inline-block;
+}
+
+/* TODAY ANIMATION */
+.today {
+    border: 2px solid #00ffea;
+    box-shadow: 0 0 15px rgba(0,255,234,0.6);
+    animation: pulse 1.6s infinite ease-in-out;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); box-shadow: 0 0 10px rgba(0,255,234,0.4); }
+    50% { transform: scale(1.05); box-shadow: 0 0 25px rgba(0,255,234,0.9); }
+    100% { transform: scale(1); box-shadow: 0 0 10px rgba(0,255,234,0.4); }
+}
+
+/* disabled buttons */
+.disabled {
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+/* POPUP INPUT */
+.popup {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.8);
+    display: none;
+    justify-content: center;
+    align-items: center;
+}
+
+.popup-box {
+    background: #1e1e2f;
+    padding: 20px;
+    border-radius: 12px;
+    width: 300px;
+}
+
+.popup-box input {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    border-radius: 8px;
+    border: none;
+}
+
+.popup-box button {
+    margin-top: 10px;
+    width: 100%;
+}
+</style>
+</head>
+
+<body>
+
+<div class="calendar">
+    <div class="header">
+        <button id="prev">◀</button>
+        <div class="month-title" id="title"></div>
+        <button id="next">▶</button>
+    </div>
+
+    <div class="weekdays">
+        <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div>
+        <div>Thu</div><div>Fri</div><div>Sat</div>
+    </div>
+
+    <div class="days" id="days"></div>
+</div>
+
+<!-- POPUP -->
+<div class="popup" id="popup">
+    <div class="popup-box">
+        <h3 id="popupDate"></h3>
+        <input type="text" id="eventInput" placeholder="Enter event...">
+        <button onclick="saveEvent()">Save</button>
+        <button onclick="closePopup()">Close</button>
+    </div>
+</div>
+
+<script>
+const daysEl = document.getElementById("days");
+const title = document.getElementById("title");
+
+const popup = document.getElementById("popup");
+const eventInput = document.getElementById("eventInput");
+const popupDate = document.getElementById("popupDate");
+
+let selectedDate = null;
+
+/* ✅ AUTO START ON CURRENT MONTH */
+let current = new Date();
+current.setDate(1);
+
+/* RANGE LIMIT */
+const min = new Date(2026, 0, 1);
+const max = new Date(2027, 2, 31);
+
+function key(date){
+    return date.toISOString().split("T")[0];
+}
+
+function load(){
+    return JSON.parse(localStorage.getItem("events") || "{}");
+}
+
+function save(data){
+    localStorage.setItem("events", JSON.stringify(data));
+}
+
+function render(){
+    daysEl.innerHTML = "";
+
+    const y = current.getFullYear();
+    const m = current.getMonth();
+
+    title.innerText = current.toLocaleString("default", {
+        month:"long",
+        year:"numeric"
+    });
+
+    const firstDay = new Date(y,m,1).getDay();
+    const lastDay = new Date(y,m+1,0).getDate();
+
+    for(let i=0;i<firstDay;i++){
+        daysEl.appendChild(document.createElement("div"));
+    }
+
+    const events = load();
+
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    for(let d=1; d<=lastDay; d++){
+        const date = new Date(y,m,d);
+        const k = key(date);
+
+        const cell = document.createElement("div");
+        cell.className = "day";
+
+        if(date.toDateString() === today.toDateString()){
+            cell.classList.add("today");
+        }
+
+        cell.innerHTML = `<div class="date">${d}</div>`;
+
+        if(events[k]){
+            cell.innerHTML += `<div class="event">${events[k]}</div>`;
+        }
+
+        cell.onclick = () => openPopup(date);
+
+        daysEl.appendChild(cell);
+    }
+
+    updateButtons();
+}
+
+function openPopup(date){
+    selectedDate = date;
+    popupDate.innerText = date.toDateString();
+
+    const events = load();
+    const k = key(date);
+
+    eventInput.value = events[k] || "";
+
+    popup.style.display = "flex";
+}
+
+function closePopup(){
+    popup.style.display = "none";
+}
+
+function saveEvent(){
+    const events = load();
+    const k = key(selectedDate);
+
+    const val = eventInput.value.trim();
+
+    if(val === ""){
+        delete events[k];
+    } else {
+        events[k] = val;
+    }
+
+    save(events);
+    closePopup();
+    render();
+}
+
+function updateButtons(){
+    document.getElementById("prev").classList.toggle("disabled", current <= min);
+    document.getElementById("next").classList.toggle("disabled", current >= max);
+}
+
+document.getElementById("prev").onclick = () => {
+    if(current <= min) return;
+    current.setMonth(current.getMonth()-1);
+    render();
+};
+
+document.getElementById("next").onclick = () => {
+    if(current >= max) return;
+    current.setMonth(current.getMonth()+1);
+    render();
+};
+
+render();
+</script>
+
+</body>
+</html>
